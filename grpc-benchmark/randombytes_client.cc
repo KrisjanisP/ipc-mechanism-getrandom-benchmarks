@@ -169,9 +169,14 @@ int main(int argc, char** argv) {
         std::cout << "---" << std::endl;
     }
 
-    // Create client
+    // Create client with 100MB message size limit
+    grpc::ChannelArguments args;
+    const int max_message_size = 100 * 1024 * 1024; // 100MB
+    args.SetMaxReceiveMessageSize(max_message_size);
+    args.SetMaxSendMessageSize(max_message_size);
+    
     RandomBytesClient client(
-        grpc::CreateChannel(server_address, grpc::InsecureChannelCredentials()));
+        grpc::CreateCustomChannel(server_address, grpc::InsecureChannelCredentials(), args));
 
     int successful_calls = 0;
     auto total_start = std::chrono::high_resolution_clock::now();

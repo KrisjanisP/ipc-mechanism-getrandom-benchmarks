@@ -37,11 +37,11 @@ class RandomBytesServiceImpl final : public RandomBytesService::Service {
     uint32_t num_bytes = request->num_bytes();
     
     // Limit the maximum number of bytes to prevent abuse
-    const uint32_t MAX_BYTES = 1024 * 1024; // 1MB limit
-    if (num_bytes > MAX_BYTES) {
-      return Status(grpc::StatusCode::INVALID_ARGUMENT, 
-                   "Requested too many bytes (max: " + std::to_string(MAX_BYTES) + ")");
-    }
+    // const uint32_t MAX_BYTES = 1024 * 1024; // 1MB limit
+    // if (num_bytes > MAX_BYTES) {
+    //   return Status(grpc::StatusCode::INVALID_ARGUMENT, 
+    //                "Requested too many bytes (max: " + std::to_string(MAX_BYTES) + ")");
+    // }
     
     if (num_bytes == 0) {
       reply->set_actual_bytes(0);
@@ -58,7 +58,12 @@ class RandomBytesServiceImpl final : public RandomBytesService::Service {
       return Status(grpc::StatusCode::INTERNAL, 
                    "Failed to generate random bytes: " + std::string(strerror(errno)));
     }
-    
+
+    if (result != num_bytes) {
+      return Status(grpc::StatusCode::INTERNAL, 
+                   "Failed to generate random bytes: " + std::string(strerror(errno)));
+    }
+
     // Set the random bytes in the reply
     reply->set_data(buffer.data(), result);
     reply->set_actual_bytes(static_cast<uint32_t>(result));
@@ -74,6 +79,12 @@ void RunServer(uint16_t port) {
   grpc::EnableDefaultHealthCheckService(true);
   grpc::reflection::InitProtoReflectionServerBuilderPlugin();
   ServerBuilder builder;
+  
+  // Set maximum message size to 100MB
+  const int max_message_size = 100 * 1024 * 1024; // 100MB
+  builder.SetMaxReceiveMessageSize(max_message_size);
+  builder.SetMaxSendMessageSize(max_message_size);
+  
   // Listen on the given address without any authentication mechanism.
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
   // Register "service" as the instance through which we'll communicate with
