@@ -2,17 +2,46 @@
 set -e # exit on error
 # set -x # print commands
 
-# /usr/bin/time -v ./bin/sd-bus-client -n 100000 -b 32 -t 0 -q
-# for N in 10000 25000 50000 75000 100000; do
-for epoch in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-    for B in 1 32 1024; do
-        for N in 100 1000 10000 25000 50000; do
-            /usr/bin/time -v -o out.txt sd-bus-client -n $N -b $B -t 0 -q
-            time=$(cat out.txt | grep "m:ss): " | cut -c 47-)
-            echo "$B $N $time" >> results.txt
-            
-            # Add a small delay between requests
-            sleep 1
+main() {
+    # bench_small
+    bench_large
+}
+
+bench_small() {
+    for epoch in 1 2 3 4 5 6 7 8 9 10; do
+        for B in 1 32 1024; do
+            for N in 100 1000 10000 25000 50000; do
+                echo "runing epoch $epoch with $B bytes and $N requests"
+                /usr/bin/time -v -o out.txt sd-bus-client -n $N -b $B -t 0 -q
+
+                # extract time from /usr/bin/time output
+                time=$(cat out.txt | grep "m:ss): " | cut -c 47-)
+                echo "$epoch $B $N $time" >> results.txt
+                
+                sleep 1 # small delay between requests
+            done
         done
     done
-done
+}
+
+bench_large() {
+    for epoch in 1 2 3; do
+        for B in $(numfmt --from=iec 10M 20M 30M 40M 50M); do
+            for N in 10 25 50 100; do
+                echo "runing epoch $epoch with $B bytes and $N requests"
+                /usr/bin/time -v -o out.txt sd-bus-client -n $N -b $B -t 0 -q
+
+                # extract time from /usr/bin/time output
+                time=$(cat out.txt | grep "m:ss): " | cut -c 47-)
+                echo "$epoch $B $N $time" >> results_large.txt
+                
+                sleep 1 # small delay between requests
+            done
+        done
+    done
+}
+
+main
+
+# clean up
+rm out.txt
