@@ -74,12 +74,7 @@ bool handle_client(int client_fd) {
         return false;
     }
     
-    // Validate request
-    const uint32_t MAX_BYTES = 1024 * 1024; // 1MB limit
-    if (request.num_bytes > MAX_BYTES) {
-        std::cerr << "Request too large: " << request.num_bytes << " bytes" << std::endl;
-        return false;
-    }
+    // Validate request - no size limits imposed
     
     // Generate random bytes
     std::vector<uint8_t> random_data;

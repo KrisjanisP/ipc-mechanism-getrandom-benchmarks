@@ -49,19 +49,46 @@ echo "Socket path: $SOCKET_PATH"
 echo "Server PID: $SERVER_PID"
 echo ""
 
-# Run the benchmark with same parameters as gRPC and D-Bus benchmarks
-for epoch in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-    for B in 1 32 1024; do
-        for N in 100 1000 10000 25000 50000 100000; do
-            echo "Running epoch $epoch: $N iterations, $B bytes per call"
-            /usr/bin/time -v -o out.txt ./build/socket_client -n $N -b $B -t 0 -q -s "$SOCKET_PATH"
-            time=$(cat out.txt | grep "m:ss): " | cut -c 47-)
-            echo "$epoch $B $N $time" >> results.txt
-            rm -f out.txt
+main() {
+    # bench_small
+    bench_large
+}
+
+bench_small() {
+    # Run the benchmark with same parameters as gRPC and D-Bus benchmarks
+    for epoch in 1 2 3 4 5 6 7 8 9 10; do
+        for B in 1 32 1024; do
+            for N in 100 1000 10000 25000 50000 100000; do
+                echo "Running epoch $epoch: $N iterations, $B bytes per call"
+                /usr/bin/time -v -o out.txt ./build/socket_client -n $N -b $B -t 0 -q -s "$SOCKET_PATH"
+                time=$(cat out.txt | grep "m:ss): " | cut -c 47-)
+                echo "$epoch $B $N $time" >> results.txt
+                rm -f out.txt
+            done
         done
     done
-done
+    echo "Small benchmark completed. Results saved to results.txt"
+}
 
-echo "Benchmark completed. Results saved to results.txt"
+bench_large() {
+    # Run large benchmark with same parameters as gRPC and D-Bus benchmarks
+    for epoch in 1 2 3; do
+        for B in $(numfmt --from=iec 10M 20M 30M 40M 50M); do
+            for N in 10 25 50 100; do
+                echo "Running epoch $epoch: $N iterations, $B bytes per call"
+                /usr/bin/time -v -o out.txt ./build/socket_client -n $N -b $B -t 0 -q -s "$SOCKET_PATH"
+                time=$(cat out.txt | grep "m:ss): " | cut -c 47-)
+                echo "$epoch $B $N $time" >> results_large.txt
+                rm -f out.txt
+                sleep 1 # small delay between requests
+            done
+        done
+    done
+    echo "Large benchmark completed. Results saved to results_large.txt"
+}
+
+main
+
+echo "All benchmarks completed."
 
 # Server will be killed by cleanup function
