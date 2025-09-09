@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package randombytes;
+
+// The random bytes service definition
+service RandomBytesService {
+  // Gets random bytes from the server
+  rpc GetRandomBytes (RandomBytesRequest) returns (RandomBytesReply) {}
+}
+
+// The request message containing the number of bytes requested
+message RandomBytesRequest {
+  uint32 num_bytes = 1;
+}
+
+// The response message containing the random bytes
+message RandomBytesReply {
+  bytes data = 1;
+  uint32 actual_bytes = 2;
+}
