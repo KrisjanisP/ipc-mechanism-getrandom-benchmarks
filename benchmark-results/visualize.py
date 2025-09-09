@@ -2,6 +2,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from collections import defaultdict
+import os
 
 def parse_time(time_str):
     """Parse time string in format 'm:ss.ss' to seconds"""
@@ -10,26 +11,28 @@ def parse_time(time_str):
     seconds = float(parts[1])
     return minutes * 60 + seconds
 
-def main():
-    results_file = "/home/kp/progr/trng-dbus-experiments/dbus-benchmark/results.txt"
-    
-    # Dictionary to store multiple measurements for each configuration
-    # Structure: data[bytes_per_call][num_calls] = [list of times]
+def parse_file(filepath):
+    """Parse benchmark file and return structured data"""
     raw_data = defaultdict(lambda: defaultdict(list))
     
-    with open(results_file, "r") as f:
+    if not os.path.exists(filepath):
+        print(f"Warning: File {filepath} not found")
+        return {}
+    
+    with open(filepath, "r") as f:
         for line in f:
             line = line.strip()
             if not line:  # Skip empty lines
                 continue
             
             parts = line.split()
-            if len(parts) != 3:
+            if len(parts) < 4:  # run_id, bytes_per_call, num_calls, time
                 continue
                 
-            bytes_per_call = int(parts[0])
-            num_calls = int(parts[1])
-            time_seconds = parse_time(parts[2])
+            run_id = int(parts[0])
+            bytes_per_call = int(parts[1])
+            num_calls = int(parts[2])
+            time_seconds = parse_time(parts[3])
             
             raw_data[bytes_per_call][num_calls].append(time_seconds)
     
@@ -41,9 +44,7 @@ def main():
             'mean_times': [],
             'std_times': [],
             'mean_throughput': [],
-            'std_throughput': [],
-            'all_times': [],
-            'all_throughput': []
+            'std_throughput': []
         }
         
         for num_calls in sorted(raw_data[bytes_per_call].keys()):
@@ -55,109 +56,176 @@ def main():
             data[bytes_per_call]['std_times'].append(np.std(times))
             data[bytes_per_call]['mean_throughput'].append(np.mean(throughputs))
             data[bytes_per_call]['std_throughput'].append(np.std(throughputs))
-            data[bytes_per_call]['all_times'].extend(times)
-            data[bytes_per_call]['all_throughput'].extend(throughputs)
     
-    # Create subplots - 2x2 layout for comprehensive visualization
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+    return data
+
+def create_comparison_plot(data_dict, title, filename, payload_sizes=[1, 32, 1024], is_large=False):
+    """Create a comparison plot for different IPC methods with multiple payload sizes"""
+    fig, ax = plt.subplots(1, 1, figsize=(10, 5))
     
-    colors = ['blue', 'orange', 'green']
-    markers = ['o', 's', '^']
+    colors = {'dbus': '#1f77b4', 'grpc': '#ff7f0e', 'socket': '#2ca02c'}
+    markers = {'dbus': 'o', 'grpc': 's', 'socket': '^'}
+    linestyles = ['-', '--']
     
-    # Plot 1: Execution time vs number of calls with error bars
-    for i, (bytes_per_call, values) in enumerate(sorted(data.items())):
-        ax1.errorbar(values['num_calls'], values['mean_times'], 
-                    yerr=values['std_times'],
-                    label=f"{bytes_per_call} bytes/call", 
-                    marker=markers[i % len(markers)],
-                    color=colors[i % len(colors)],
-                    capsize=5, capthick=2)
+    # Plot each IPC method
+    for method, data in data_dict.items():
+        if not data:  # Skip if no data
+            continue
+            
+        # For each payload size, plot the execution times
+        for i, payload_size in enumerate(payload_sizes):
+            if payload_size in data:
+                # Format payload size for legend
+                if is_large:
+                    size_mb = payload_size // (1024 * 1024)
+                    size_label = f"{size_mb}MB"
+                else:
+                    size_label = f"{payload_size}B"
+                
+                label = f"{method.upper()} ({size_label})"
+                
+                ax.errorbar(data[payload_size]['num_calls'], 
+                           data[payload_size]['mean_times'],
+                           yerr=data[payload_size]['std_times'],
+                           label=label,
+                           marker=markers[method],
+                           color=colors[method],
+                           linestyle=linestyles[i % len(linestyles)],
+                           capsize=3, capthick=1.5,
+                           markersize=6, linewidth=2,
+                           alpha=0.8)
     
-    ax1.set_xlabel("Number of D-Bus calls")
-    ax1.set_ylabel("Execution time (seconds)")
-    ax1.set_title("D-Bus Benchmark: Mean Execution Time ± Std Dev")
-    ax1.grid(True, alpha=0.3)
-    ax1.legend()
+    # Formatting
+    ax.set_xlabel("Number of calls", fontsize=14, fontweight='bold')
+    ax.set_ylabel("Execution time (seconds)", fontsize=14, fontweight='bold')
+    ax.set_title(title, fontsize=16, fontweight='bold', pad=20)
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=10, loc='lower right', ncol=1)
     
-    # Plot 2: Throughput with error bars
-    for i, (bytes_per_call, values) in enumerate(sorted(data.items())):
-        ax2.errorbar(values['num_calls'], values['mean_throughput'], 
-                    yerr=values['std_throughput'],
-                    label=f"{bytes_per_call} bytes/call", 
-                    marker=markers[i % len(markers)],
-                    color=colors[i % len(colors)],
-                    capsize=5, capthick=2)
+    # Increase tick label sizes
+    ax.tick_params(axis='both', which='major', labelsize=12)
     
-    ax2.set_xlabel("Number of D-Bus calls")
-    ax2.set_ylabel("Throughput (calls/second)")
-    ax2.set_title("D-Bus Benchmark: Mean Throughput ± Std Dev")
-    ax2.grid(True, alpha=0.3)
-    ax2.legend()
+    # Use log scale for better visualization if needed
+    max_time = 0
+    for method, data in data_dict.items():
+        if data:
+            for ps in payload_sizes:
+                if ps in data and data[ps]['mean_times']:
+                    max_time = max(max_time, max(data[ps]['mean_times']))
     
-    # Add reference lines for common throughput levels
-    ax2.axhline(1000, color='gray', linestyle='--', alpha=0.5)
-    ax2.text(ax2.get_xlim()[1]*0.7, 1000*1.05, '1K calls/sec', 
-             horizontalalignment='center', color='gray')
-    
-    ax2.axhline(10000, color='gray', linestyle='--', alpha=0.5)
-    ax2.text(ax2.get_xlim()[1]*0.7, 10000*1.05, '10K calls/sec', 
-             horizontalalignment='center', color='gray')
-    
-    # Plot 3: Coefficient of Variation (CV) for execution times
-    for i, (bytes_per_call, values) in enumerate(sorted(data.items())):
-        # Calculate CV = std/mean * 100
-        cv_times = [(std/mean)*100 if mean > 0 else 0 
-                   for mean, std in zip(values['mean_times'], values['std_times'])]
-        ax3.plot(values['num_calls'], cv_times,
-                label=f"{bytes_per_call} bytes/call", 
-                marker=markers[i % len(markers)],
-                color=colors[i % len(colors)])
-    
-    ax3.set_xlabel("Number of D-Bus calls")
-    ax3.set_ylabel("Coefficient of Variation (%)")
-    ax3.set_title("D-Bus Benchmark: Execution Time Variability")
-    ax3.grid(True, alpha=0.3)
-    ax3.legend()
-    
-    # Plot 4: Box plot showing distribution for largest test case (50000 calls)
-    box_data = []
-    box_labels = []
-    for bytes_per_call in sorted(data.keys()):
-        # Get all times for 50000 calls
-        times_50k = []
-        for num_calls, times in raw_data[bytes_per_call].items():
-            if num_calls == 50000:
-                times_50k = times
-                break
-        if times_50k:
-            box_data.append(times_50k)
-            box_labels.append(f"{bytes_per_call}B")
-    
-    if box_data:
-        bp = ax4.boxplot(box_data, labels=box_labels, patch_artist=True)
-        for patch, color in zip(bp['boxes'], colors[:len(box_data)]):
-            patch.set_facecolor(color)
-            patch.set_alpha(0.7)
-    
-    ax4.set_xlabel("Payload size (bytes/call)")
-    ax4.set_ylabel("Execution time (seconds)")
-    ax4.set_title("Distribution of Execution Times (50K calls)")
-    ax4.grid(True, alpha=0.3)
+    if max_time > 10:
+        ax.set_yscale('log')
     
     plt.tight_layout()
-    plt.savefig("dbus_benchmark_results.png", dpi=300, bbox_inches='tight')
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Saved: {filename}")
+
+def print_statistics(data_dict, title):
+    """Print statistics for comparison"""
+    print(f"\n{'='*50}")
+    print(f"{title}")
+    print(f"{'='*50}")
     
-    # Print some statistics
-    print("\n=== D-Bus Benchmark Statistics ===")
-    for bytes_per_call in sorted(data.keys()):
-        print(f"\n{bytes_per_call} bytes/call:")
-        for i, num_calls in enumerate(data[bytes_per_call]['num_calls']):
-            mean_time = data[bytes_per_call]['mean_times'][i]
-            std_time = data[bytes_per_call]['std_times'][i]
-            cv = (std_time/mean_time)*100 if mean_time > 0 else 0
-            print(f"  {num_calls:5d} calls: {mean_time:.3f}±{std_time:.3f}s (CV: {cv:.1f}%)")
+    for method, data in data_dict.items():
+        if not data:
+            continue
+            
+        print(f"\n{method.upper()} Performance:")
+        print("-" * 30)
+        
+        for bytes_per_call in sorted(data.keys()):
+            print(f"\n{bytes_per_call} bytes/call:")
+            for i, num_calls in enumerate(data[bytes_per_call]['num_calls']):
+                mean_time = data[bytes_per_call]['mean_times'][i]
+                std_time = data[bytes_per_call]['std_times'][i]
+                mean_throughput = data[bytes_per_call]['mean_throughput'][i]
+                cv = (std_time/mean_time)*100 if mean_time > 0 else 0
+                print(f"  {num_calls:6d} calls: {mean_time:7.3f}±{std_time:5.3f}s "
+                      f"({mean_throughput:8.1f} calls/sec, CV: {cv:4.1f}%)")
+
+def main():
+    base_path = "/home/kp/progr/trng-dbus-experiments/benchmark-results"
     
-    plt.show()
+    # File paths
+    files = {
+        'regular': {
+            'dbus': f"{base_path}/dbus.txt",
+            'grpc': f"{base_path}/grpc.txt", 
+            'socket': f"{base_path}/socket.txt"
+        },
+        'large': {
+            'dbus': f"{base_path}/dbus_large.txt",
+            'grpc': f"{base_path}/grpc_large.txt",
+            'socket': f"{base_path}/socket_large.txt"
+        }
+    }
+    
+    # Parse all data files
+    print("Parsing benchmark data files...")
+    
+    regular_data = {}
+    large_data = {}
+    
+    for method in ['dbus', 'grpc', 'socket']:
+        regular_data[method] = parse_file(files['regular'][method])
+        large_data[method] = parse_file(files['large'][method])
+    
+    # Create comparison plots
+    print("\nCreating comparison plots...")
+    
+    # Regular data plot - 2 payload sizes (1, 1024 bytes) on one plot
+    payload_sizes = [1, 1024]  # Small and large regular payloads
+    create_comparison_plot(
+        regular_data,
+        "IPC Performance Comparison - Regular Payloads",
+        "ipc_comparison_regular.png",
+        payload_sizes,
+        is_large=False
+    )
+    
+    # Large data plot - 2 payload sizes (10MB, 30MB) on one plot  
+    large_payload_sizes = [10485760, 31457280]  # 10MB, 30MB
+    create_comparison_plot(
+        large_data,
+        "IPC Performance Comparison - Large Payloads",
+        "ipc_comparison_large.png",
+        large_payload_sizes,
+        is_large=True
+    )
+    
+    # Print comprehensive statistics
+    print_statistics(regular_data, "REGULAR PAYLOAD BENCHMARKS")
+    print_statistics(large_data, "LARGE PAYLOAD BENCHMARKS")
+    
+    # Summary comparison
+    print(f"\n{'='*60}")
+    print("PERFORMANCE SUMMARY")
+    print(f"{'='*60}")
+    
+    # Compare throughput at specific test points
+    test_points = [
+        ('Regular', 1000, 1),
+        ('Regular', 10000, 32), 
+        ('Regular', 50000, 1024),
+        ('Large', 25, 10485760),
+        ('Large', 50, 20971520)
+    ]
+    
+    for test_type, num_calls, payload_size in test_points:
+        print(f"\n{test_type} test: {num_calls} calls, {payload_size} bytes/call")
+        print("-" * 50)
+        
+        data_set = regular_data if test_type == 'Regular' else large_data
+        
+        for method in ['socket', 'dbus', 'grpc']:  # Order by typical performance
+            if method in data_set and payload_size in data_set[method]:
+                method_data = data_set[method][payload_size]
+                if num_calls in method_data['num_calls']:
+                    idx = method_data['num_calls'].index(num_calls)
+                    mean_time = method_data['mean_times'][idx]
+                    throughput = method_data['mean_throughput'][idx]
+                    print(f"{method.upper():>8}: {mean_time:7.3f}s ({throughput:8.1f} calls/sec)")
 
 if __name__ == "__main__":
     main()
