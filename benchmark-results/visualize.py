@@ -226,7 +226,7 @@ def main():
     payload_sizes = [1, 1024]  # Small and large regular payloads
     create_comparison_plot(
         regular_data,
-        "IPC latency comparison - small payloads (1B, 1KiB)",
+        "IPC comparison - small payloads (1B, 1KiB)",
         "ipc-comparison-small.png",
         payload_sizes,
         is_large=False
@@ -236,7 +236,7 @@ def main():
     large_payload_sizes = [10485760, 31457280]  # 10MB, 30MB
     create_comparison_plot(
         large_data,
-        "IPC throughput comparison - large payloads (10,30MiB)",
+        "IPC comparison - large payloads (10,30MiB)",
         "ipc-comparison-large.png",
         large_payload_sizes,
         is_large=True
