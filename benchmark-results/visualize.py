@@ -33,6 +33,9 @@ def parse_file(filepath):
             bytes_per_call = int(parts[1])
             num_calls = int(parts[2])
             time_seconds = parse_time(parts[3])
+
+            if (time_seconds < 2**-6):
+                continue
             
             raw_data[bytes_per_call][num_calls].append(time_seconds)
     
@@ -61,7 +64,7 @@ def parse_file(filepath):
 
 def create_comparison_plot(data_dict, title, filename, payload_sizes=[1, 32, 1024], is_large=False):
     """Create a comparison plot for different IPC methods with multiple payload sizes"""
-    fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+    fig, ax = plt.subplots(1, 1, figsize=(9, 5))
     
     colors = {'dbus': '#1f77b4', 'grpc': '#ff7f0e', 'socket': '#2ca02c'}
     markers = {'dbus': 'o', 'grpc': 's', 'socket': '^'}
@@ -78,7 +81,7 @@ def create_comparison_plot(data_dict, title, filename, payload_sizes=[1, 32, 102
                 # Format payload size for legend
                 if is_large:
                     size_mb = payload_size // (1024 * 1024)
-                    size_label = f"{size_mb}MB"
+                    size_label = f"{size_mb}MiB"
                 else:
                     size_label = f"{payload_size}B"
                 
@@ -96,9 +99,9 @@ def create_comparison_plot(data_dict, title, filename, payload_sizes=[1, 32, 102
                            alpha=0.8)
     
     # Formatting
-    ax.set_xlabel("Number of calls", fontsize=14, fontweight='bold')
-    ax.set_ylabel("Execution time (seconds)", fontsize=14, fontweight='bold')
-    ax.set_title(title, fontsize=16, fontweight='bold', pad=20)
+    ax.set_xlabel("Number of calls", fontsize=14, fontweight='medium')
+    ax.set_ylabel("Wall time (seconds)", fontsize=14, fontweight='medium')
+    ax.set_title(title, fontsize=16, fontweight='medium', pad=20)
     ax.grid(True, alpha=0.3)
     ax.legend(fontsize=10, loc='lower right', ncol=1)
     
@@ -114,7 +117,7 @@ def create_comparison_plot(data_dict, title, filename, payload_sizes=[1, 32, 102
                     max_time = max(max_time, max(data[ps]['mean_times']))
     
     if max_time > 10:
-        ax.set_yscale('log')
+        ax.set_yscale('log', base=2)
     
     plt.tight_layout()
     plt.savefig(filename, dpi=300, bbox_inches='tight')
@@ -178,7 +181,7 @@ def main():
     payload_sizes = [1, 1024]  # Small and large regular payloads
     create_comparison_plot(
         regular_data,
-        "IPC Performance Comparison - Regular Payloads",
+        "IPC mechanism comparison - small payloads",
         "ipc_comparison_regular.png",
         payload_sizes,
         is_large=False
@@ -188,7 +191,7 @@ def main():
     large_payload_sizes = [10485760, 31457280]  # 10MB, 30MB
     create_comparison_plot(
         large_data,
-        "IPC Performance Comparison - Large Payloads",
+        "IPC mechanism comparison - large payloads",
         "ipc_comparison_large.png",
         large_payload_sizes,
         is_large=True
