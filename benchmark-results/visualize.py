@@ -108,6 +108,10 @@ def create_comparison_plot(data_dict, title, filename, payload_sizes=[1, 32, 102
     # Increase tick label sizes
     ax.tick_params(axis='both', which='major', labelsize=12)
     
+    # Add horizontal reference lines for better overview
+    ax.axhline(y=1.0, color='darkgreen', linestyle=':', alpha=0.7, linewidth=1.5, label='1 second')
+    ax.axhline(y=60.0, color='darkred', linestyle=':', alpha=0.7, linewidth=1.5, label='1 minute')
+    
     # Use log scale for better visualization if needed
     max_time = 0
     for method, data in data_dict.items():
