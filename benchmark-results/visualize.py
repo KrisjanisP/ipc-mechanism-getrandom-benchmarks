@@ -68,7 +68,7 @@ def create_comparison_plot(data_dict, title, filename, payload_sizes=[1, 32, 102
     
     colors = {'dbus': '#1f77b4', 'grpc': '#ff7f0e', 'socket': '#2ca02c'}
     markers = {'dbus': 'o', 'grpc': 's', 'socket': '^'}
-    linestyles = ['-', '--']
+    linestyles = ['-', '-.']
     
     # Plot each IPC method
     for method, data in data_dict.items():
@@ -99,9 +99,9 @@ def create_comparison_plot(data_dict, title, filename, payload_sizes=[1, 32, 102
                            alpha=0.8)
     
     # Formatting
-    ax.set_xlabel("Number of calls", fontsize=14, fontweight='medium')
-    ax.set_ylabel("Wall time (seconds)", fontsize=14, fontweight='medium')
-    ax.set_title(title, fontsize=16, fontweight='medium', pad=20)
+    ax.set_xlabel("Number of calls (log scale)", fontsize=14, fontweight='medium')
+    ax.set_ylabel("Wall time (seconds, log scale)", fontsize=14, fontweight='medium')
+    ax.set_title(title, fontsize=14, fontweight='medium', pad=20)
     ax.grid(True, alpha=0.3)
     ax.legend(fontsize=10, loc='lower right', ncol=1)
     
@@ -109,8 +109,46 @@ def create_comparison_plot(data_dict, title, filename, payload_sizes=[1, 32, 102
     ax.tick_params(axis='both', which='major', labelsize=12)
     
     # Add horizontal reference lines for better overview
-    ax.axhline(y=1.0, color='darkgreen', linestyle=':', alpha=0.7, linewidth=1.5, label='1 second')
-    ax.axhline(y=60.0, color='darkred', linestyle=':', alpha=0.7, linewidth=1.5, label='1 minute')
+
+    if not is_large:
+        ax.axhline(y=1.0, color='darkgreen', linestyle=':', alpha=0.7, linewidth=2, label='1 second')
+        x_middle = ax.get_xlim()[1] / 2
+
+        x_offset_1s = 90
+        if is_large:
+            x_offset_1s = x_middle
+
+        y_offset_1s = 0.2
+        if is_large:
+            y_offset_1s = -0.38
+
+        ax.text(x_offset_1s, 1.0+y_offset_1s, '1 s', ha='left', va='bottom', 
+                    fontsize=14, color='darkgreen', fontweight='medium')
+        
+        x_offset_30s = 90
+        if is_large:
+            x_offset_30s = x_middle
+
+        y_offset_30s = 8
+        if is_large:
+            y_offset_30s = 5
+
+        ax.axhline(y=30.0, color='darkred', linestyle=':', alpha=0.7, linewidth=2, label='30 ')
+        ax.text(x_offset_30s, 30.0+y_offset_30s, '30 s', ha='left', va='bottom',
+                fontsize=14, color='darkred', fontweight='medium')
+        
+        ax.text(300-20, 0.05, '300', ha='right', va='bottom',
+                fontsize=14, color='#ff8010', fontweight='medium')
+        ax.axvline(x=300, color="#ff8010", linestyle=':', alpha=0.7, linewidth=2)
+        ax.set_xticks(list(ax.get_xticks()) + [300])
+
+        ax.text(3500-200, 0.05, '3500', ha='right', va='bottom',
+                fontsize=14, color='#1f77b4', fontweight='medium')
+        ax.axvline(x=3500, color="#1f77b4", linestyle=':', alpha=0.7, linewidth=2)
+        
+        ax.text(25000-2000, 0.05, '25000', ha='right', va='bottom',
+                fontsize=14, color='#2ca02c', fontweight='medium')
+        ax.axvline(x=25000, color="#2ca02c", linestyle=':', alpha=0.7, linewidth=2)
     
     # Use log scale for better visualization if needed
     max_time = 0
@@ -120,8 +158,8 @@ def create_comparison_plot(data_dict, title, filename, payload_sizes=[1, 32, 102
                 if ps in data and data[ps]['mean_times']:
                     max_time = max(max_time, max(data[ps]['mean_times']))
     
-    if max_time > 10:
-        ax.set_yscale('log', base=2)
+    ax.set_yscale('log', base=2)
+    ax.set_xscale('log', base=2)
     
     plt.tight_layout()
     plt.savefig(filename, dpi=300, bbox_inches='tight')
@@ -185,7 +223,7 @@ def main():
     payload_sizes = [1, 1024]  # Small and large regular payloads
     create_comparison_plot(
         regular_data,
-        "IPC mechanism comparison - small payloads",
+        "IPC latency comparison - small payloads (1B, 1KiB)",
         "ipc_comparison_regular.png",
         payload_sizes,
         is_large=False
@@ -195,7 +233,7 @@ def main():
     large_payload_sizes = [10485760, 31457280]  # 10MB, 30MB
     create_comparison_plot(
         large_data,
-        "IPC mechanism comparison - large payloads",
+        "IPC throughput comparison - large payloads (10MiB, 30MiB)",
         "ipc_comparison_large.png",
         large_payload_sizes,
         is_large=True
