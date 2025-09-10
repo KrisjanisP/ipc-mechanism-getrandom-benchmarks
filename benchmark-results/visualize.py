@@ -64,7 +64,7 @@ def parse_file(filepath):
 
 def create_comparison_plot(data_dict, title, filename, payload_sizes=[1, 32, 1024], is_large=False):
     """Create a comparison plot for different IPC methods with multiple payload sizes"""
-    fig, ax = plt.subplots(1, 1, figsize=(9, 5))
+    fig, ax = plt.subplots(1, 1, figsize=(6, 5))
     
     colors = {'dbus': '#1f77b4', 'grpc': '#ff7f0e', 'socket': '#2ca02c'}
     markers = {'dbus': 'o', 'grpc': 's', 'socket': '^'}
@@ -103,7 +103,10 @@ def create_comparison_plot(data_dict, title, filename, payload_sizes=[1, 32, 102
     ax.set_ylabel("Wall time (seconds, log scale)", fontsize=14, fontweight='medium')
     ax.set_title(title, fontsize=14, fontweight='medium', pad=20)
     ax.grid(True, alpha=0.3)
-    ax.legend(fontsize=10, loc='lower right', ncol=1)
+    if is_large:
+        ax.legend(fontsize=10, loc='lower right', ncol=1)
+    else:
+        ax.legend(fontsize=10, loc='upper right', ncol=1)
     
     # Increase tick label sizes
     ax.tick_params(axis='both', which='major', labelsize=12)
@@ -137,16 +140,16 @@ def create_comparison_plot(data_dict, title, filename, payload_sizes=[1, 32, 102
         ax.text(x_offset_30s, 30.0+y_offset_30s, '30 s', ha='left', va='bottom',
                 fontsize=14, color='darkred', fontweight='medium')
         
-        ax.text(300-20, 0.05, '300', ha='right', va='bottom',
+        ax.text(300+20, 0.05, '300', ha='left', va='bottom',
                 fontsize=14, color='#ff8010', fontweight='medium')
         ax.axvline(x=300, color="#ff8010", linestyle=':', alpha=0.7, linewidth=2)
         ax.set_xticks(list(ax.get_xticks()) + [300])
 
-        ax.text(3500-200, 0.05, '3500', ha='right', va='bottom',
+        ax.text(3500+200, 0.05, '3500', ha='left', va='bottom',
                 fontsize=14, color='#1f77b4', fontweight='medium')
         ax.axvline(x=3500, color="#1f77b4", linestyle=':', alpha=0.7, linewidth=2)
         
-        ax.text(25000-2000, 0.05, '25000', ha='right', va='bottom',
+        ax.text(25000+2000, 0.05, '25000', ha='left', va='bottom',
                 fontsize=14, color='#2ca02c', fontweight='medium')
         ax.axvline(x=25000, color="#2ca02c", linestyle=':', alpha=0.7, linewidth=2)
     
@@ -224,7 +227,7 @@ def main():
     create_comparison_plot(
         regular_data,
         "IPC latency comparison - small payloads (1B, 1KiB)",
-        "ipc_comparison_regular.png",
+        "ipc-comparison-small.png",
         payload_sizes,
         is_large=False
     )
@@ -233,8 +236,8 @@ def main():
     large_payload_sizes = [10485760, 31457280]  # 10MB, 30MB
     create_comparison_plot(
         large_data,
-        "IPC throughput comparison - large payloads (10MiB, 30MiB)",
-        "ipc_comparison_large.png",
+        "IPC throughput comparison - large payloads (10,30MiB)",
+        "ipc-comparison-large.png",
         large_payload_sizes,
         is_large=True
     )
